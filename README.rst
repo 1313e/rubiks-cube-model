@@ -8,4 +8,4 @@ PUMAS is used for mapping out the flux of muons detected in the Stawell gold min
 
 Installation
 ------------
-This library can be easily built with the `Makefile` by simply using `make` in the root directory.
+This library can be easily built with the ``Makefile`` by simply using ``make`` in the root directory.
