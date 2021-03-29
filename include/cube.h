@@ -35,7 +35,10 @@ enum rubiks_cube_return{
     RUBIKS_CUBE_RETURN_EMPTY_FILE,
 
     // Cube is not contained within rubiks cube
-    RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND
+    RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND,
+
+    // Cube file has wrong format
+    RUBIKS_CUBE_RETURN_FORMAT_ERROR
 };
 
 /**

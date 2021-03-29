@@ -60,31 +60,39 @@ struct rubiks_cube{
 };
 
 // Private function for interpreting a line from a CSV file
-static void interpret_CSV_line(char *line, double *x, double *y, double *z,
-                               double *density, int *rock_id){
+static int interpret_CSV_line(char *line, double *x, double *y, double *z,
+                              double *density, int *rock_id){
     // Initialize variables
+    int ntok = 5;
     const char sep[2] = ",";
     char *field;
 
     // Obtain the x field
-    field = strtok(line, sep);
+    if ((field = strtok(line, sep)) == NULL) return ntok;
+    else ntok--;
     sscanf(field, "%lf", x);
 
     // Obtain the y field
-    field = strtok(NULL, sep);
+    if ((field = strtok(NULL, sep)) == NULL) return ntok;
+    else ntok--;
     sscanf(field, "%lf", y);
 
     // Obtain the z field
-    field = strtok(NULL, sep);
+    if ((field = strtok(NULL, sep)) == NULL) return ntok;
+    else ntok--;
     sscanf(field, "%lf", z);
 
     // Obtain the density field
-    field = strtok(NULL, sep);
+    if ((field = strtok(NULL, sep)) == NULL) return ntok;
+    else ntok--;
     sscanf(field, "%lf", density);
 
     // Obtain the rock_id field
-    field = strtok(NULL, sep);
+    if ((field = strtok(NULL, sep)) == NULL) return ntok;
+    else ntok--;
     sscanf(field, "%i", rock_id);
+
+    return ntok;
 }
 
 // Create and/or read the meta data file required for the rubiks_cube struct
@@ -109,16 +117,17 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
         FILE *file = fopen(file_path, "r");
 
         // Declare some variables required for determining the number of cubes/stacks/layers in the file
-        int ret, rock_id_temp;
+        int rock_id_temp, ntok;
         double x_temp, yi, yj, zi, zj, density_temp;
         size_t n_cubes, n_stacks, n_layers;
-        
+        char * ret;
+
         // Initialize numbers to 1 (as the first line is not inspected)
         n_cubes = n_stacks = n_layers = 1;
 
         // Read in first line of file
-        ret = fscanf(file, "%s", line);
-        if (ret == EOF) {
+        ret = fgets(line, sizeof line, file);
+        if (ret == NULL) {
             // If this is the EOF, the file is empty
             fclose(file);
             fprintf(stderr, "ERROR: File is empty!\n");
@@ -128,17 +137,18 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
         // Check if first character is part of a number
         if (!(line[0] >= '0' && line[0] <= '9')) {
             // If not, the file has a header
-            ret = fscanf(file, "%s", line);
+            fgets(line, sizeof line, file);
         }
 
         // Interpret the first line
-        interpret_CSV_line(line, &x_temp, &yi, &zi, &density_temp, &rock_id_temp);
+        ntok = interpret_CSV_line(line, &x_temp, &yi, &zi, &density_temp, &rock_id_temp);
+        if (ntok) goto format_error;
 
         // Read new line
-        ret = fscanf(file, "%s", line);
+        ret = fgets(line, sizeof line, file);
 
         // Read all remaining lines in the file and determine number of cubes, stacks and layers
-        while (ret != EOF) {
+        while (ret != NULL) {
             // Swap yi and zi to yj and zj
             yj = yi;
             zj = zi;
@@ -147,7 +157,8 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
             n_cubes++;
 
             // Interpret line
-            interpret_CSV_line(line, &x_temp, &yi, &zi, &density_temp, &rock_id_temp);
+            ntok = interpret_CSV_line(line, &x_temp, &yi, &zi, &density_temp, &rock_id_temp);
+            if (ntok) goto format_error;
 
             // Check if a new layer was read in
             if (zi != zj) {
@@ -161,16 +172,23 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
             }
 
             // Read new line
-            ret = fscanf(file, "%s", line);
+            ret = fgets(line, sizeof line, file);
         }
 
         // Close the data file
         fclose(file);
+        goto write_metadata;
 
+format_error:
+        fclose(file);
+        fprintf(stderr, "ERROR: Invalid file format (%s)!\n", file_path);
+        return RUBIKS_CUBE_RETURN_FORMAT_ERROR;
+
+write_metadata:
         // Write the meta data to file
-        FILE *file_meta = fopen(file_path_meta, "w");
-        fprintf(file_meta, "%zu,%zu,%zu", n_cubes, n_stacks, n_layers);
-        fclose(file_meta);
+        file = fopen(file_path_meta, "w");
+        fprintf(file, "%zu,%zu,%zu", n_cubes, n_stacks, n_layers);
+        fclose(file);
 
         // Assign values to proper pointers
         *n_cubes_ptr = n_cubes;
@@ -180,7 +198,7 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
     else {
         // If so, read it
         FILE *file_meta = fopen(file_path_meta, "r");
-        fscanf(file_meta, "%s", line);
+        fgets(line, sizeof line, file_meta);
         fclose(file_meta);
 
         // Initialize variables
@@ -254,27 +272,27 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
     FILE *file = fopen(file_path, "r");
 
     // Read in first line of file
-    fscanf(file, "%s", line);
+    fgets(line, sizeof line, file);
 
     // Check if first character is part of a number
     if (!(line[0] >= '0' && line[0] <= '9')) {
         // If not, the file has a header, so read in the actual first line
-        fscanf(file, "%s", line);
+        fgets(line, sizeof line, file);
     }
 
     // Interpret the first line of the file outside of the following loop
     interpret_CSV_line(line, &cube->x[0], &yi, &zi,
                        &cube->density[0], &cube->rock_id[0]);
-    
+
     // Assign values of yi and zi to y and z
     cube->y[0].v = yi;
     cube->y[0].i = 0;
     cube->z[0].v = zi;
     cube->z[0].i = 0;
-    
+
     // Set the values of dx, dy and dz for checking later
     cube->dx = cube->dy = cube->dz = 0;
-    
+
     // Loop over all remaining lines in the file and read in their contents
     unsigned long ny = 1;
     unsigned long nz = 1;
@@ -284,10 +302,10 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
         zj = zi;
 
         // Read line and assign
-        fscanf(file, "%s", line);
+        fgets(line, sizeof line, file);
         interpret_CSV_line(line, &cube->x[i], &yi, &zi,
                            &cube->density[i], &cube->rock_id[i]);
-        
+
         // Attempt to determine dx if not done before
         if (cube->dx == 0 && cube->x[i] != cube->x[i-1]) {
             cube->dx = fabs(cube->x[i]-cube->x[i-1])/2;
@@ -570,7 +588,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
         else {
             ry = DBL_MAX;
         }
-        
+
         // Determine how many times dz can fit in the remainder of this cube
         if (dz != 0) {
             rz = fabs(((cube->z[zi].v+(dz/fabs(dz))*cube->dz)-z)/dz);
@@ -578,7 +596,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
         else {
             rz = DBL_MAX;
         }
-        
+
         // Determine the smallest of these factors
         double min_r = min(rx, min(ry, rz));
 
