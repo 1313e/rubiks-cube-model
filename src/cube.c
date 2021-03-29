@@ -70,27 +70,27 @@ static int interpret_CSV_line(char *line, double *x, double *y, double *z,
     // Obtain the x field
     if ((field = strtok(line, sep)) == NULL) return ntok;
     else ntok--;
-    sscanf(field, "%lf", x);
+    *x = strtod(field, NULL);
 
     // Obtain the y field
     if ((field = strtok(NULL, sep)) == NULL) return ntok;
     else ntok--;
-    sscanf(field, "%lf", y);
+    *y = strtod(field, NULL);
 
     // Obtain the z field
     if ((field = strtok(NULL, sep)) == NULL) return ntok;
     else ntok--;
-    sscanf(field, "%lf", z);
+    *z = strtod(field, NULL);
 
     // Obtain the density field
     if ((field = strtok(NULL, sep)) == NULL) return ntok;
     else ntok--;
-    sscanf(field, "%lf", density);
+    *density = strtod(field, NULL);
 
     // Obtain the rock_id field
     if ((field = strtok(NULL, sep)) == NULL) return ntok;
     else ntok--;
-    sscanf(field, "%i", rock_id);
+    *rock_id = (int)strtod(field, NULL);
 
     return ntok;
 }
