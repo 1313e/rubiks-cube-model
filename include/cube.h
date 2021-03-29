@@ -34,11 +34,11 @@ enum rubiks_cube_return{
     // Cube file is empty
     RUBIKS_CUBE_RETURN_EMPTY_FILE,
 
-    // Cube is not contained within rubiks cube
-    RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND,
-
     // Cube file has wrong format
-    RUBIKS_CUBE_RETURN_FORMAT_ERROR
+    RUBIKS_CUBE_RETURN_FORMAT_ERROR,
+
+    // Cube is not contained within rubiks cube
+    RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND
 };
 
 /**
@@ -59,6 +59,8 @@ enum rubiks_cube_return{
  *     RUBIKS_CUBE_RETURN_MALLOC_ERROR      Cube memory could not be allocated
  *
  *     RUBIKS_CUBE_RETURN_EMPTY_FILE        Cube file is empty
+ *
+ *     RUBIKS_CUBE_RETURN_FORMAT_ERROR      Cube file has wrong format
  */
 enum rubiks_cube_return rubiks_cube_create(
     struct rubiks_cube **cube, const char *file_path);
