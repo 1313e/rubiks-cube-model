@@ -21,22 +21,14 @@ You may redistribute and/or modify it without any restrictions, as long as the c
 #define min(A, B) (A < B ? A : B)
 #define max(A, B) (A > B ? A : B)
 
-// Declare struct for holding Y and Z coordinate data
-struct coord_data{
-    // Data value
-    double v;
-    // Starting index of lower coordinate
-    unsigned long i;
-};
-
 // Declare struct for holding geometry data
 struct rubiks_cube{
     // Dynamic array of cube center X-coordinates
     double *x;
     // Dynamic array of cube center Y-coordinate data
-    struct coord_data *y;
+    double *y;
     // Dynamic array of cube center Z-coordinate data
-    struct coord_data *z;
+    double *z;
     // Distance from cube center to cube face in X-direction
     double dx;
     // Distance from cube center to cube face in Y-direction
@@ -47,16 +39,12 @@ struct rubiks_cube{
     double *density;
     // Dynamic array of cube medium/rock IDs
     int *rock_id;
-    // Index of last cube that was checked
-    unsigned long cur_idx[3];
-    // Index of estimated next cube
-    unsigned long next_idx[3];
-    // Total number of layers (length of z)
-    size_t n_layers;
-    // Total number of stacks (length of y)
-    size_t n_stacks;
-    // Total number of cubes (length of x)
-    size_t n_cubes;
+    // Total number of x-values
+    size_t nx;
+    // Total number of y-values
+    size_t ny;
+    // Total number of z-values
+    size_t nz;
 };
 
 // Private function for interpreting a line from a CSV file
@@ -122,8 +110,8 @@ static int interpret_CSV_line(char *line, double *x, double *y, double *z,
 }
 
 // Create and/or read the meta data file required for the rubiks_cube struct
-static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_cubes_ptr,
-                                              size_t *n_stacks_ptr, size_t *n_layers_ptr){
+static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *nx_ptr,
+                                              size_t *ny_ptr, size_t *nz_ptr){
     // Check if the provided data file exists
     if (access(file_path, R_OK) == -1) {
         // If no existing file was passed, raise error and return
@@ -143,13 +131,15 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
         FILE *file = fopen(file_path, "r");
 
         // Declare some variables required for determining the number of cubes/stacks/layers in the file
-        int rock_id_temp, ntok;
-        double x_temp, yi, yj, zi, zj, density_temp;
-        size_t n_cubes, n_stacks, n_layers;
+        int rock_id_tmp, ntok;
+        double x0, y0, z0, xi, yi, zi, xj, yj, zj, density_tmp;
+        size_t nx, ny, nz;
+        _Bool x_all, y_all, z_all;
         char * ret;
 
         // Initialize numbers to 1 (as the first line is not inspected)
-        n_cubes = n_stacks = n_layers = 1;
+        x_all = y_all = z_all = 0;
+        nx = ny = nz = 1;
 
         // Read in first line of file
         ret = fgets(line, sizeof(line), file);
@@ -167,38 +157,67 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
         }
 
         // Interpret the first line
-        ntok = interpret_CSV_line(line, &x_temp, &yi, &zi, &density_temp, &rock_id_temp);
+        ntok = interpret_CSV_line(line, &x0, &y0, &z0, &density_tmp, &rock_id_tmp);
         if (ntok) {
             goto format_error;
         }
+        xi = x0;
+        yi = y0;
+        zi = z0;
 
         // Read new line
         ret = fgets(line, sizeof(line), file);
 
-        // Read all remaining lines in the file and determine number of cubes, stacks and layers
+        // Read all remaining lines in the file and determine number of x, y and z values
         while (ret != NULL) {
-            // Swap yi and zi to yj and zj
+            // Swap xj, yj, zj to xi, yi, zi
+            xj = xi;
             yj = yi;
             zj = zi;
 
-            // Increase n_cubes by 1 
-            n_cubes++;
-
             // Interpret line
-            ntok = interpret_CSV_line(line, &x_temp, &yi, &zi, &density_temp, &rock_id_temp);
+            ntok = interpret_CSV_line(line, &xi, &yi, &zi, &density_tmp, &rock_id_tmp);
             if (ntok) {
                 goto format_error;
             }
 
-            // Check if a new layer was read in
-            if (zi != zj) {
-                n_layers++;
-                n_stacks++;
+            // Check if a new x-value was read in
+            if (!x_all && (xi != xj)) {
+                // Check if this x-value is not the first value read in
+                if (xi == x0) {
+                    // If so, set flag to True
+                    x_all = 1;
+                }
+                else {
+                    // Else, increase nx by 1
+                    nx++;
+                }
             }
 
-            // Check if a new stack was read in
-            else if (yi != yj) {
-                n_stacks++;
+            // Check if a new y-value was read in
+            if (!y_all && (yi != yj)) {
+                // Check if this y-value is not the first value read in
+                if (yi == y0) {
+                    // If so, set flag to True
+                    y_all = 1;
+                }
+                else {
+                    // Else, increase ny by 1
+                    ny++;
+                }
+            }
+
+            // Check if a new z-value was read in
+            if (!z_all && (zi != zj)) {
+                // Check if this z-value is not the first value read in
+                if (zi == z0) {
+                    // If so, set flag to True
+                    z_all = 1;
+                }
+                else {
+                    // Else, increase nz by 1
+                    nz++;
+                }
             }
 
             // Read new line
@@ -220,13 +239,13 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
         write_metadata:
             // Write the meta data to file
             file = fopen(file_path_meta, "w");
-            fprintf(file, "%zu,%zu,%zu", n_cubes, n_stacks, n_layers);
+            fprintf(file, "%zu,%zu,%zu", nx, ny, nz);
             fclose(file);
 
         // Assign values to proper pointers
-        *n_cubes_ptr = n_cubes;
-        *n_stacks_ptr = n_stacks;
-        *n_layers_ptr = n_layers;
+        *nx_ptr = nx;
+        *ny_ptr = ny;
+        *nz_ptr = nz;
     }
     else {
         // If so, read it
@@ -240,15 +259,15 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
 
         // Obtain the x field
         field = strtok(line, sep);
-        sscanf(field, "%zu", n_cubes_ptr);
+        sscanf(field, "%zu", nx_ptr);
 
         // Obtain the y field
         field = strtok(NULL, sep);
-        sscanf(field, "%zu", n_stacks_ptr);
+        sscanf(field, "%zu", ny_ptr);
 
         // Obtain the z field
         field = strtok(NULL, sep);
-        sscanf(field, "%zu", n_layers_ptr);
+        sscanf(field, "%zu", nz_ptr);
     }
 
     // Return that everything went okay
@@ -259,10 +278,10 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *n_c
 enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr, 
                                            const char *file_path){
     // Initialize size variables
-    size_t n_cubes, n_stacks, n_layers;
+    size_t nx, ny, nz;
 
     // Obtain values for these variables
-    enum rubiks_cube_return rc = read_meta_data(file_path, &n_cubes, &n_stacks, &n_layers);
+    enum rubiks_cube_return rc = read_meta_data(file_path, &nx, &ny, &nz);
     if (rc != RUBIKS_CUBE_RETURN_SUCCESS) {
         // If that failed, return the error code
         return(rc);
@@ -279,11 +298,11 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
     }
 
     // Allocate memory for member arrays in the rubiks_cube struct
-    cube->x = (double *)malloc(sizeof(double)*n_cubes);
-    cube->y = (struct coord_data *)malloc(sizeof(struct coord_data)*n_stacks);
-    cube->z = (struct coord_data *)malloc(sizeof(struct coord_data)*n_layers);
-    cube->density = (double *)malloc(sizeof(double)*n_cubes);
-    cube->rock_id = (int *)malloc(sizeof(int)*n_cubes);
+    cube->x = (double *)malloc(sizeof(double)*nx);
+    cube->y = (double *)malloc(sizeof(double)*ny);
+    cube->z = (double *)malloc(sizeof(double)*nz);
+    cube->density = (double *)malloc(sizeof(double)*nx*ny*nz);
+    cube->rock_id = (int *)malloc(sizeof(int)*nx*ny*nz);
 
     // Check if memory allocation was done correctly
     if (cube->x == NULL || cube->y == NULL || cube->z == NULL ||
@@ -298,8 +317,14 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
 
     // Initialize some variables required for looping through the file
     unsigned long i;
-    double yi, yj, zi, zj;
+    int xi, yi, zi;
+    double x_tmp, y_tmp, z_tmp;
+    _Bool x_all, y_all, z_all;
     char line[80];
+
+    // Initialize values of *_all
+    xi = yi = zi = 0;
+    x_all = y_all = z_all = 0;
 
     // Open the data file
     FILE *file = fopen(file_path, "r");
@@ -314,64 +339,73 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
     }
 
     // Interpret the first line of the file outside of the following loop
-    interpret_CSV_line(line, &cube->x[0], &yi, &zi,
+    interpret_CSV_line(line, &cube->x[0], &cube->y[0], &cube->z[0],
                        &cube->density[0], &cube->rock_id[0]);
-
-    // Assign values of yi and zi to y and z
-    cube->y[0].v = yi;
-    cube->y[0].i = 0;
-    cube->z[0].v = zi;
-    cube->z[0].i = 0;
 
     // Set the values of dx, dy and dz for checking later
     cube->dx = cube->dy = cube->dz = 0;
 
     // Loop over all remaining lines in the file and read in their contents
-    unsigned long ny = 1;
-    unsigned long nz = 1;
-    for (i=1; i<n_cubes; i++) {
-        // Swap yi and zi to yj and zj
-        yj = yi;
-        zj = zi;
-
+    for (i=1; i<nx*ny*nz; i++) {
         // Read line and assign
         fgets(line, sizeof(line), file);
-        interpret_CSV_line(line, &cube->x[i], &yi, &zi,
+        interpret_CSV_line(line, &x_tmp, &y_tmp, &z_tmp,
                            &cube->density[i], &cube->rock_id[i]);
 
-        // Attempt to determine dx if not done before
-        if (cube->dx == 0 && cube->x[i] != cube->x[i-1]) {
-            cube->dx = fabs(cube->x[i]-cube->x[i-1])/2;
-        }
+        // Check if a new x-value was read in
+        if (!x_all && (x_tmp != cube->x[xi])) {
+            // Check if this x-value is not the first value read in
+            if (x_tmp == cube->x[0]) {
+                // If so, set flag to True
+                x_all = 1;
+            }
+            else {
+                // Else, store value
+                xi++;
+                cube->x[xi] = x_tmp;
 
-        // Check if the current z value is different from the previous
-        if (zi != zj) {
-            // If so, store it in z and add 1 to nz
-            cube->z[nz].v = zi;
-            cube->z[nz].i = ny;
-            nz++;
-
-            // Store new y as well
-            cube->y[ny].v = yi;
-            cube->y[ny].i = i;
-            ny++;
-
-            // Attempt to determine dz if not done before
-            if (cube->dz == 0) {
-                cube->dz = fabs(zi-zj)/2;
+                // Attempt to determine dx if not done before
+                if (cube->dx == 0) {
+                    cube->dx = (cube->x[xi]-cube->x[xi-1])/2;
+                }
             }
         }
 
-        // Check if the current y value is different from the previous
-        else if (yi != yj) {
-            // If so, store it in y and add 1 to ny
-            cube->y[ny].v = yi;
-            cube->y[ny].i = i;
-            ny++;
+        // Check if a new y-value was read in
+        if (!y_all && (y_tmp != cube->y[yi])) {
+            // Check if this y-value is not the first value read in
+            if (y_tmp == cube->y[0]) {
+                // If so, set flag to True
+                y_all = 1;
+            }
+            else {
+                // Else, store value
+                yi++;
+                cube->y[yi] = y_tmp;
 
-            // Attempt to determine dy if not done before
-            if (cube->dy == 0) {
-                cube->dy = fabs(yi-yj)/2;
+                // Attempt to determine dy if not done before
+                if (cube->dy == 0) {
+                    cube->dy = (cube->y[yi]-cube->y[yi-1])/2;
+                }
+            }
+        }
+
+        // Check if a new z-value was read in
+        if (!z_all && (z_tmp != cube->z[zi])) {
+            // Check if this z-value is not the first value read in
+            if (z_tmp == cube->z[0]) {
+                // If so, set flag to True
+                z_all = 1;
+            }
+            else {
+                // Else, store value
+                zi++;
+                cube->z[zi] = z_tmp;
+
+                // Attempt to determine dz if not done before
+                if (cube->dz == 0) {
+                    cube->dz = (cube->z[zi]-cube->z[zi-1])/2;
+                }
             }
         }
     }
@@ -386,15 +420,9 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
     }
 
     // Assign remaining members
-    cube->cur_idx[0] = 0;
-    cube->cur_idx[1] = 0;
-    cube->cur_idx[2] = 0;
-    cube->next_idx[0] = -1;
-    cube->next_idx[1] = -1;
-    cube->next_idx[2] = -1;
-    cube->n_cubes = n_cubes;
-    cube->n_stacks = n_stacks;
-    cube->n_layers = n_layers;
+    cube->nx = nx;
+    cube->ny = ny;
+    cube->nz = nz;
 
     // Return success
     return(RUBIKS_CUBE_RETURN_SUCCESS);
@@ -433,175 +461,60 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
     unsigned long xi, yi, zi;
     _Bool x_flag, y_flag, z_flag;
 
-    // Check if current cube holds the required X-coordinate
-    if (dx >= 0) {
-        x_flag = (cube->x[cube->cur_idx[0]]-cube->dx <= x) && (x < cube->x[cube->cur_idx[0]]+cube->dx);
-    }
-    else {
-        x_flag = (cube->x[cube->cur_idx[0]]-cube->dx < x) && (x <= cube->x[cube->cur_idx[0]]+cube->dx);
-    }
+    // Calculate the index of the X-coordinate of the cube
+    xi = (unsigned long)floor(fabs((x-(cube->x[0]-cube->dx))/(2*cube->dx)));
 
-    // Check if current cube holds the required Y-coordinate
-    if (dy >= 0) {
-        y_flag = (cube->y[cube->cur_idx[1]].v-cube->dy <= y) && (y < cube->y[cube->cur_idx[1]].v+cube->dy);
-    }
-    else {
-        y_flag = (cube->y[cube->cur_idx[1]].v-cube->dy < y) && (y <= cube->y[cube->cur_idx[1]].v+cube->dy);
+    // If particle is moving in negative X-direction, decrease xi by 1
+    if (dx < 0) {
+        xi--;
     }
 
-    // Check if current cube holds the required Z-coordinate
-    if (dz >= 0) {
-        z_flag = (cube->z[cube->cur_idx[2]].v-cube->dz <= z) && (z < cube->z[cube->cur_idx[2]].v+cube->dz);
-    }
-    else {
-        z_flag = (cube->z[cube->cur_idx[2]].v-cube->dz < z) && (z <= cube->z[cube->cur_idx[2]].v+cube->dz);
+    // If xi < 0 or xi >= nx, the requested cube does not exist
+    if (xi < 0 || xi >= cube->nx) {
+        return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
     }
 
-    // Check if all three flags are true
-    if (x_flag && y_flag && z_flag) {
-        // If so, the current cube is required
-        xi = cube->cur_idx[0];
-        yi = cube->cur_idx[1];
-        zi = cube->cur_idx[2];
+    // Calculate the index of the Y-coordinate of the cube
+    yi = (unsigned long)floor(fabs((y-(cube->y[0]-cube->dy))/(2*cube->dy)));
+
+    // If particle is moving in negative Y-direction, decrease yi by 1
+    if (dy < 0) {
+        yi--;
     }
 
-    // Else, search for the cube normally
-    else {
-        // Check if the next predicted cube Z-coordinate is correct
-        zi = cube->next_idx[2];
-        if (dz >= 0) {
-            // If particle is moving in positive direction, exclude upper limit of cube
-            if (zi == -1 ||
-                !((cube->z[zi].v-cube->dz <= z) && (z < cube->z[zi].v+cube->dz))) {
-                // If not, find the cube that has the correct Z-coordinate
-                zi = 0;
-                while (zi < cube->n_layers &&
-                       !((cube->z[zi].v-cube->dz <= z) && (z < cube->z[zi].v+cube->dz))) {
-                    zi++;
-                }
-            }
-        }
-        else {
-            // Else, exclude lower limit of cube
-            if (zi == -1 ||
-                !((cube->z[zi].v-cube->dz < z) && (z <= cube->z[zi].v+cube->dz))) {
-                // If not, find the cube that has the correct Z-coordinate
-                zi = 0;
-                while (zi < cube->n_layers &&
-                       !((cube->z[zi].v-cube->dz < z) && (z <= cube->z[zi].v+cube->dz))) {
-                    zi++;
-                }
-            }
-        }
-
-        // If zi == n_layers, the requested cube does not exist
-        if (zi == cube->n_layers) {
-            return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
-        }
-
-        // Determine how many Y-coordinates this Z-coordinate has
-        unsigned long yj;
-        if (zi < cube->n_layers-1) {
-            yj = cube->z[zi+1].i;
-        }
-        else {
-            yj = cube->n_stacks;
-        }
-
-        // Check if the next predicted cube Y-coordinate is correct
-        yi = cube->next_idx[1];
-        if (dy >= 0) {
-            // If particle is moving in positive direction, exclude upper limit of cube
-            if (yi == -1 ||
-                !((cube->y[yi].v-cube->dy <= y) && (y < cube->y[yi].v+cube->dy))) {
-                // If not, find the cube that has the correct Y-coordinate
-                yi = cube->z[zi].i;
-                while (yi < yj &&
-                       !((cube->y[yi].v-cube->dy <= y) && (y < cube->y[yi].v+cube->dy))) {
-                    yi++;
-                }
-            }
-        }
-        else {
-            // Else, exclude lower limit of cube
-            if (yi == -1 ||
-                !((cube->y[yi].v-cube->dy < y) && (y <= cube->y[yi].v+cube->dy))) {
-                // If not, find the cube that has the correct Y-coordinate
-                yi = cube->z[zi].i;
-                while (yi < yj &&
-                       !((cube->y[yi].v-cube->dy < y) && (y <= cube->y[yi].v+cube->dy))) {
-                    yi++;
-                }
-            }
-        }
-
-        // If yi == yj, the requested cube does not exist
-        if (yi == yj) {
-            return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
-        }
-
-        // Determine how many X-coordinates this Y-coordinate has
-        unsigned long xj;
-        if (yi < cube->n_stacks-1) {
-            xj = cube->y[yi+1].i;
-        }
-        else {
-            xj = cube->n_cubes;
-        }
-
-        // Check if the next predicted cube X-coordinate is correct
-        xi = cube->next_idx[0];
-        if (dx >= 0) {
-            // If particle is moving in positive direction, exclude upper limit of cube
-            if (xi == -1 ||
-                !((cube->x[xi]-cube->dx <= x) && (x < cube->x[xi]+cube->dx))) {
-                // If not, find the cube that has the correct X-coordinate
-                xi = cube->y[yi].i;
-                while (xi < xj &&
-                    !((cube->x[xi]-cube->dx <= x) && (x < cube->x[xi]+cube->dx))) {
-                    xi++;
-                }
-            }
-        }
-        else {
-            // Else, exclude lower limit of cube
-            if (xi == -1 ||
-                !((cube->x[xi]-cube->dx < x) && (x <= cube->x[xi]+cube->dx))) {
-                // If not, find the cube that has the correct X-coordinate
-                xi = cube->y[yi].i;
-                while (xi < xj &&
-                    !((cube->x[xi]-cube->dx < x) && (x <= cube->x[xi]+cube->dx))) {
-                    xi++;
-                }
-            }
-        }
-
-        // If xi == xj, the requested cube does not exist
-        if (xi == xj) {
-            return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
-        }
+    // If yi < 0 or yi >= ny, the requested cube does not exist
+    if (yi < 0 || yi >= cube->ny) {
+        return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
     }
 
-    // Save this index
-    cube->cur_idx[0] = xi;
-    cube->cur_idx[1] = yi;
-    cube->cur_idx[2] = zi;
+    // Calculate the index of the Z-coordinate of the cube
+    zi = (unsigned long)floor(fabs((z-(cube->z[0]-cube->dz))/(2*cube->dz)));
+
+    // If particle is moving in negative Z-direction, decrease zi by 1
+    if (dz < 0) {
+        zi--;
+    }
+
+    // If zi < 0 or zi >= nz, the requested cube does not exist
+    if (zi < 0 || zi >= cube->nz) {
+        return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
+    }
 
     // Obtain all requested values
     if (x_ptr != NULL) {
         *x_ptr = cube->x[xi];
     }
     if (y_ptr != NULL) {
-        *y_ptr = cube->y[yi].v;
+        *y_ptr = cube->y[yi];
     }
     if (z_ptr != NULL) {
-        *z_ptr = cube->z[zi].v;
+        *z_ptr = cube->z[zi];
     }
     if (density_ptr != NULL) {
-        *density_ptr = cube->density[xi];
+        *density_ptr = cube->density[zi*cube->nx*cube->ny+yi*cube->nx+xi];
     }
     if (rock_id_ptr != NULL) {
-        *rock_id_ptr = cube->rock_id[xi];
+        *rock_id_ptr = cube->rock_id[zi*cube->nx*cube->ny+yi*cube->nx+xi];
     }
     if (step_ptr != NULL) {
         double rx, ry, rz;
@@ -616,7 +529,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
 
         // Determine how many times dy can fit in the remainder of this cube
         if (dy != 0) {
-            ry = fabs(((cube->y[yi].v+(dy/fabs(dy))*cube->dy)-y)/dy);
+            ry = fabs(((cube->y[yi]+(dy/fabs(dy))*cube->dy)-y)/dy);
         }
         else {
             ry = DBL_MAX;
@@ -624,7 +537,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
 
         // Determine how many times dz can fit in the remainder of this cube
         if (dz != 0) {
-            rz = fabs(((cube->z[zi].v+(dz/fabs(dz))*cube->dz)-z)/dz);
+            rz = fabs(((cube->z[zi]+(dz/fabs(dz))*cube->dz)-z)/dz);
         }
         else {
             rz = DBL_MAX;
@@ -640,27 +553,6 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
 
         // Determine distance of vector made out of these distances and assign it
         *step_ptr = sqrt(pow(dx, 2)+pow(dy, 2)+pow(dz, 2));
-
-        // Check if the next estimated Z-coordinate is different
-        if (rz == min_r) {
-            cube->next_idx[0] = -1;
-            cube->next_idx[1] = -1;
-            cube->next_idx[2] = max(0, min(zi+(int)(dz/fabs(dz)), cube->n_layers-1));
-        }
-
-        // Else, check if the next estimated Y-coordinate is different
-        else if (ry == min_r) {
-            cube->next_idx[0] = -1;
-            cube->next_idx[1] = max(0, min(yi+(int)(dy/fabs(dy)), cube->n_stacks-1));
-            cube->next_idx[2] = zi;
-        }
-
-        // Else, the next estimated X-coordinate is different
-        else {
-            cube->next_idx[0] = max(0, min(xi+(int)(dx/fabs(dx)), cube->n_cubes-1));
-            cube->next_idx[1] = yi;
-            cube->next_idx[2] = zi;
-        }
     }
 
     // Return success
