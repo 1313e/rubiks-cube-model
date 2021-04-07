@@ -462,7 +462,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
     _Bool x_flag, y_flag, z_flag;
 
     // Calculate the index of the X-coordinate of the cube
-    xi = (unsigned long)floor(fabs((x-(cube->x[0]-cube->dx))/(2*cube->dx)));
+    xi = (unsigned long)floor((x-(cube->x[0]-cube->dx))/(2*cube->dx));
 
     // If particle is moving in negative X-direction, decrease xi by 1
     if (dx < 0) {
@@ -475,7 +475,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
     }
 
     // Calculate the index of the Y-coordinate of the cube
-    yi = (unsigned long)floor(fabs((y-(cube->y[0]-cube->dy))/(2*cube->dy)));
+    yi = (unsigned long)floor((y-(cube->y[0]-cube->dy))/(2*cube->dy));
 
     // If particle is moving in negative Y-direction, decrease yi by 1
     if (dy < 0) {
@@ -488,7 +488,7 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
     }
 
     // Calculate the index of the Z-coordinate of the cube
-    zi = (unsigned long)floor(fabs((z-(cube->z[0]-cube->dz))/(2*cube->dz)));
+    zi = (unsigned long)floor((z-(cube->z[0]-cube->dz))/(2*cube->dz));
 
     // If particle is moving in negative Z-direction, decrease zi by 1
     if (dz < 0) {
