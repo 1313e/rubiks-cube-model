@@ -35,6 +35,18 @@ struct rubiks_cube{
     double dy;
     // Distance from cube center to cube face in Z-direction
     double dz;
+    // The lower/upper X-limit of the first cube
+    double x0;
+    // The lower/upper Y-limit of the first cube
+    double y0;
+    // The lower/upper Z-limit of the first cube
+    double z0;
+    // The distance between the centers of two adjacent cubes in the X-direction
+    double x_diff;
+    // The distance between the centers of two adjacent cubes in the Y-direction
+    double y_diff;
+    // The distance between the centers of two adjacent cubes in the Z-direction
+    double z_diff;
     // Dynamic array of cube densities
     double *density;
     // Dynamic array of cube medium/rock IDs
@@ -52,7 +64,7 @@ static int interpret_CSV_line(char *line, double *x, double *y, double *z,
                               double *density, int *rock_id){
     // Initialize variables
     int ntok = 5;
-    const char sep[2] = ",";
+    const char sep[3] = ", ";
     char *field;
 
     // Obtain the x field
@@ -342,9 +354,6 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
     interpret_CSV_line(line, &cube->x[0], &cube->y[0], &cube->z[0],
                        &cube->density[0], &cube->rock_id[0]);
 
-    // Set the values of dx, dy and dz for checking later
-    cube->dx = cube->dy = cube->dz = 0;
-
     // Loop over all remaining lines in the file and read in their contents
     for (i=1; i<nx*ny*nz; i++) {
         // Read line and assign
@@ -363,11 +372,6 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
                 // Else, store value
                 xi++;
                 cube->x[xi] = x_tmp;
-
-                // Attempt to determine dx if not done before
-                if (cube->dx == 0) {
-                    cube->dx = (cube->x[xi]-cube->x[xi-1])/2;
-                }
             }
         }
 
@@ -382,11 +386,6 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
                 // Else, store value
                 yi++;
                 cube->y[yi] = y_tmp;
-
-                // Attempt to determine dy if not done before
-                if (cube->dy == 0) {
-                    cube->dy = (cube->y[yi]-cube->y[yi-1])/2;
-                }
             }
         }
 
@@ -401,23 +400,41 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
                 // Else, store value
                 zi++;
                 cube->z[zi] = z_tmp;
-
-                // Attempt to determine dz if not done before
-                if (cube->dz == 0) {
-                    cube->dz = (cube->z[zi]-cube->z[zi-1])/2;
-                }
             }
         }
     }
     fclose(file);
 
-    // If dy or dz is still zero, set to dx
-    if (cube->dy == 0) {
-        cube->dy = cube->dx;
+    // Set dx
+    double dx;
+    dx = (cube->x[1]-cube->x[0])/2;
+    cube->x0 = cube->x[0]-dx;
+    cube->x_diff = 2*dx;
+    cube->dx = fabs(dx);
+
+    // Set dy
+    double dy;
+    if (ny > 1) {
+        dy = (cube->y[1]-cube->y[0])/2;
     }
-    if (cube->dz == 0) {
-        cube->dz = cube->dx;
+    else {
+        dy = dx;
     }
+    cube->y0 = cube->y[0]-dy;
+    cube->y_diff = 2*dy;
+    cube->dy = fabs(dy);
+
+    // Set dz
+    double dz;
+    if (nz > 1) {
+        dz = (cube->z[1]-cube->z[0])/2;
+    }
+    else {
+        dz = dx;
+    }
+    cube->z0 = cube->z[0]-dz;
+    cube->z_diff = 2*dz;
+    cube->dz = fabs(dz);
 
     // Assign remaining members
     cube->nx = nx;
@@ -459,15 +476,16 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
                                               double *step_ptr){
     // Declare some variables
     unsigned long xi, yi, zi;
-    _Bool x_flag, y_flag, z_flag;
+    double xii, yii, zii, xf, yf, zf;
 
     // Calculate the index of the X-coordinate of the cube
-    xi = (unsigned long)floor((x-(cube->x[0]-cube->dx))/(2*cube->dx));
+    xf = modf((x-cube->x0)/cube->x_diff, &xii);
 
     // If particle is moving in negative X-direction, decrease xi by 1
-    if (dx < 0) {
-        xi--;
+    if (dx < 0 && xf == 0) {
+        xii--;
     }
+    xi = xii;
 
     // If xi < 0 or xi >= nx, the requested cube does not exist
     if (xi < 0 || xi >= cube->nx) {
@@ -475,12 +493,13 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
     }
 
     // Calculate the index of the Y-coordinate of the cube
-    yi = (unsigned long)floor((y-(cube->y[0]-cube->dy))/(2*cube->dy));
+    yf = modf((y-cube->y0)/cube->y_diff, &yii);
 
     // If particle is moving in negative Y-direction, decrease yi by 1
-    if (dy < 0) {
-        yi--;
+    if (dy < 0 && yf == 0) {
+        yii--;
     }
+    yi = yii;
 
     // If yi < 0 or yi >= ny, the requested cube does not exist
     if (yi < 0 || yi >= cube->ny) {
@@ -488,12 +507,13 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
     }
 
     // Calculate the index of the Z-coordinate of the cube
-    zi = (unsigned long)floor((z-(cube->z[0]-cube->dz))/(2*cube->dz));
+    zf = modf((z-cube->z0)/cube->z_diff, &zii);
 
-    // If particle is moving in negative Z-direction, decrease zi by 1
-    if (dz < 0) {
-        zi--;
+    // If particle is moving in positive Z-direction, decrease zi by 1
+    if (dz >= 0 && zf == 0) {
+        zii--;
     }
+    zi = zii;
 
     // If zi < 0 or zi >= nz, the requested cube does not exist
     if (zi < 0 || zi >= cube->nz) {
