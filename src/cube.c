@@ -20,6 +20,7 @@ You may redistribute and/or modify it without any restrictions, as long as the c
 // Macros
 #define min(A, B) (A < B ? A : B)
 #define max(A, B) (A > B ? A : B)
+#define ffloor(x) ((long)x-(x<(long)x))
 
 // Declare struct for holding geometry data
 struct rubiks_cube{
@@ -476,47 +477,47 @@ enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
                                               double *step_ptr){
     // Declare some variables
     unsigned long xi, yi, zi;
-    double xii, yii, zii, xf, yf, zf;
+    double xf, yf, zf;
 
     // Calculate the index of the X-coordinate of the cube
-    xf = modf((x-cube->x0)/cube->x_diff, &xii);
+    xf = (x-cube->x0)/cube->x_diff;
+    xi = ffloor(xf);
 
     // If particle is moving in negative X-direction, decrease xi by 1
-    if (dx < 0 && xf == 0) {
-        xii--;
+    if (dx < 0 && xf == xi) {
+        xi--;
     }
-    xi = xii;
 
-    // If xi < 0 or xi >= nx, the requested cube does not exist
-    if (xi < 0 || xi >= cube->nx) {
+    // If xi >= nx, the requested cube does not exist
+    if (xi >= cube->nx) {
         return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
     }
 
     // Calculate the index of the Y-coordinate of the cube
-    yf = modf((y-cube->y0)/cube->y_diff, &yii);
+    yf = (y-cube->y0)/cube->y_diff;
+    yi = ffloor(yf);
 
     // If particle is moving in negative Y-direction, decrease yi by 1
-    if (dy < 0 && yf == 0) {
-        yii--;
+    if (dy < 0 && yf == yi) {
+        yi--;
     }
-    yi = yii;
 
-    // If yi < 0 or yi >= ny, the requested cube does not exist
-    if (yi < 0 || yi >= cube->ny) {
+    // If yi >= ny, the requested cube does not exist
+    if (yi >= cube->ny) {
         return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
     }
 
     // Calculate the index of the Z-coordinate of the cube
-    zf = modf((z-cube->z0)/cube->z_diff, &zii);
+    zf = (z-cube->z0)/cube->z_diff;
+    zi = ffloor(zf);
 
     // If particle is moving in positive Z-direction, decrease zi by 1
-    if (dz >= 0 && zf == 0) {
-        zii--;
+    if (dz >= 0 && zf == zi) {
+        zi--;
     }
-    zi = zii;
 
-    // If zi < 0 or zi >= nz, the requested cube does not exist
-    if (zi < 0 || zi >= cube->nz) {
+    // If zi >= nz, the requested cube does not exist
+    if (zi >= cube->nz) {
         return(RUBIKS_CUBE_RETURN_CUBE_NOT_FOUND);
     }
 
