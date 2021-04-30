@@ -58,6 +58,8 @@ struct rubiks_cube{
     size_t ny;
     // Total number of z-values
     size_t nz;
+    // Name of file that was loaded
+    const char *file_path;
 };
 
 // Private function for interpreting a line from a CSV file
@@ -441,6 +443,7 @@ enum rubiks_cube_return rubiks_cube_create(struct rubiks_cube **cube_ptr,
     cube->nx = nx;
     cube->ny = ny;
     cube->nz = nz;
+    cube->file_path = file_path;
 
     // Return success
     return(RUBIKS_CUBE_RETURN_SUCCESS);
