@@ -70,6 +70,15 @@ void rubiks_cube_destroy(
     struct rubiks_cube **cube);
 
 /**
+ * Get primary altitude of rubiks_cube struct.
+ *
+ * @param cube      The Rubik's cube.
+ * @param alt_ptr   Pointer where to store the primary altitude.
+ */
+void rubiks_cube_primary_altitude(
+    struct rubiks_cube *cube, double *alt_ptr);
+
+/**
  * Find cube in which provided coordinates are located.
  *
  * @param x             X-coordinate of particle.

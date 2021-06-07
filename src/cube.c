@@ -471,6 +471,11 @@ void rubiks_cube_destroy(struct rubiks_cube **cube_ptr){
     *cube_ptr = NULL;
 }
 
+// Get primary altitude value of cube
+void rubiks_cube_primary_altitude(struct rubiks_cube *cube, double *alt_ptr){
+    *alt_ptr = cube->z0;
+}
+
 // Find cube in which provided coordinates are located
 enum rubiks_cube_return rubiks_cube_find_cube(double x, double y, double z,
                                               double dx, double dy, double dz,
