@@ -14,7 +14,7 @@ Model data
 ----------
 The model requires a data file with 5 columns (``X``, ``Y``, ``Z``, ``density``, ``rock_id``) separated by either commas or spaces.
 The data is assumed to be part of a regular 3D grid with no holes or missing cubes.
-The coordinates in the data file themselves are assumed to change the fastest in the X-direction, then in the Y-direction and then in the Z-direction (e.g., for every Z-value, all possible Y-values are given and for every of these Y-values, all X-values are given).
+The coordinates in the data file themselves are assumed to change the fastest in the positive X-direction, then in the positive Y-direction and then in the negative Z-direction (e.g., for every Z-value, all possible Y-values are given and for every of these Y-values, all X-values are given).
 
 Usage
 -----
