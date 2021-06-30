@@ -1,5 +1,5 @@
-Rubik's Cube Model
-==================
+Rubik's Cube
+============
 This repo contains the C-library that I wrote during my ADACS internship in 2021.
 It implements a small Rubik's cube model that is used for the `PUMAS muon transport engine`_.
 PUMAS is used for mapping out the flux of muons detected in the Stawell gold mine in Victoria, Australia.
