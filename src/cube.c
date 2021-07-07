@@ -135,8 +135,8 @@ static enum rubiks_cube_return read_meta_data(const char *file_path, size_t *nx_
     }
 
     // Obtain name of meta data file
-    char file_path_meta[80];
-    char line[80];
+    char file_path_meta[256];
+    char line[120];
     sprintf(file_path_meta, "%s.meta", file_path);
 
     // Check if this meta data file exists
